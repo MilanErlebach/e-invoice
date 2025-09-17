@@ -46,7 +46,8 @@ public class FacturxService {
       }
       inv.setNumber(invNumber)
          .setIssueDate(java.sql.Date.valueOf(issue))
-         .setCurrency(dto.header != null && dto.header.currency != null ? dto.header.currency : "EUR");
+         .setCurrency(dto.header != null && dto.header.currency != null ? dto.header.currency : "EUR")
+         .setDeliveryDate(java.sql.Date.valueOf(issue)); // Set delivery date to issue date as fallback
 
       // Leistungszeitraum - only set if both dates are valid
       if (dto.header != null && notBlank(dto.header.serviceFrom) && notBlank(dto.header.serviceTo)) {
@@ -205,6 +206,11 @@ public class FacturxService {
       // Debug: Check invoice dates before setting transaction
       System.out.println("Invoice issue date: " + inv.getIssueDate());
       System.out.println("Invoice due date: " + inv.getDueDate());
+      System.out.println("Invoice number: " + inv.getNumber());
+      System.out.println("Invoice currency: " + inv.getCurrency());
+      System.out.println("Invoice sender: " + (inv.getSender() != null ? inv.getSender().getName() : "null"));
+      System.out.println("Invoice recipient: " + (inv.getRecipient() != null ? inv.getRecipient().getName() : "null"));
+      System.out.println("Invoice items count: " + (inv.getItems() != null ? inv.getItems().size() : "null"));
       
       // Direkt die Invoice übergeben (ohne ZUGFeRDTransaction)
       exporter.setTransaction(inv);

@@ -1,12 +1,13 @@
+# IDE
 .idea/
 .vscode/
-.target/
+
+# Build-Output
 target/
-.env
+**/target/
 *.log
+
+# Temporäres
 *.pdf
-
-
-# editor backups
-*.bak*
-
+*.bak.*
+.env

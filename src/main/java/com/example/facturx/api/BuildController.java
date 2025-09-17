@@ -23,6 +23,9 @@ public class BuildController {
             @RequestPart("pdf") MultipartFile pdf) {
         
         try {
+            System.out.println("Received invoice: " + invoice);
+            System.out.println("Received PDF: " + pdf.getOriginalFilename() + ", size: " + pdf.getSize());
+            
             byte[] result = facturxService.buildFacturX(invoice, pdf);
             
             HttpHeaders headers = new HttpHeaders();
@@ -32,6 +35,8 @@ public class BuildController {
             return new ResponseEntity<>(result, headers, HttpStatus.OK);
             
         } catch (Exception e) {
+            System.err.println("Error in buildFacturX: " + e.getMessage());
+            e.printStackTrace();
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }

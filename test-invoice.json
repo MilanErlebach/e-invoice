@@ -1,0 +1,107 @@
+{
+  "seller": {
+    "name": "SoundBundle",
+    "street": "Quitzowstraße 51",
+    "zip": "10559",
+    "city": "Berlin",
+    "country": "DE",
+    "vat_id": "DE357547178",
+    "tax_number": "34/590/00394",
+    "iban": "DE49 1101 0101 5424 3612 49",
+    "bic": "SOBKDEB2XXX",
+    "email": "rent@soundbundle.de"
+  },
+  "buyer": {
+    "name": "Château Royal GmbH & Co. KG",
+    "street": "",
+    "zip": "20095",
+    "city": "Hamburg",
+    "country": "DE",
+    "vat_id": "",
+    "buyer_reference": "PO-2025-7788",
+    "leitweg_id": ""
+  },
+  "invoice": {
+    "number": "2025-SB-1758",
+    "issue_date": "2025-09-17",
+    "service_from": "2025-10-13",
+    "service_to": "2025-10-14",
+    "due_date": "2025-09-24",
+    "currency": "EUR"
+  },
+  "lines": [
+    {
+      "discount": null,
+      "quantity": "1",
+      "tax_rate": "19",
+      "unit_code": "DAY",
+      "description": "Powered loudspeaker",
+      "gross_price": "41.5",
+      "tax_category": "S"
+    },
+    {
+      "discount": null,
+      "quantity": "1",
+      "tax_rate": "19",
+      "unit_code": "DAY",
+      "description": "Speaker stand",
+      "gross_price": "5",
+      "tax_category": "S"
+    },
+    {
+      "discount": null,
+      "quantity": "1",
+      "tax_rate": "19",
+      "unit_code": "C62",
+      "description": "Cold device cable",
+      "gross_price": "0",
+      "tax_category": "S"
+    },
+    {
+      "discount": null,
+      "quantity": "1",
+      "tax_rate": "19",
+      "unit_code": "DAY",
+      "description": "XLR cables - 10m",
+      "gross_price": "1",
+      "tax_category": "S"
+    },
+    {
+      "discount": null,
+      "quantity": "1",
+      "tax_rate": "19",
+      "unit_code": "DAY",
+      "description": "Small PA Mixer - ZED 14",
+      "gross_price": "22",
+      "tax_category": "S"
+    },
+    {
+      "discount": null,
+      "quantity": "6",
+      "tax_rate": "19",
+      "unit_code": "DAY",
+      "description": "Wireless Microphone",
+      "gross_price": "49",
+      "tax_category": "S"
+    },
+    {
+      "discount": null,
+      "quantity": "1",
+      "tax_rate": "19",
+      "unit_code": "C62",
+      "description": "Delivery & Pickup",
+      "gross_price": "95",
+      "tax_category": "S"
+    }
+  ],
+  "payment": {
+    "iban": "DE49 1101 0101 5424 3612 49",
+    "bic": "SOBKDEB2XXX",
+    "remittance_information": "Rechnung 2025-SB-1758"
+  },
+  "totals": {
+    "subtotalGross": "363.5",
+    "discountGross": "109.05",
+    "grandTotalGross": "349.45"
+  }
+}

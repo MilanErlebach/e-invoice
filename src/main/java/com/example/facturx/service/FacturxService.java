@@ -210,7 +210,7 @@ public class FacturxService {
       System.out.println("Invoice currency: " + inv.getCurrency());
       System.out.println("Invoice sender: " + (inv.getSender() != null ? inv.getSender().getName() : "null"));
       System.out.println("Invoice recipient: " + (inv.getRecipient() != null ? inv.getRecipient().getName() : "null"));
-      System.out.println("Invoice items count: " + (inv.getItems() != null ? inv.getItems().size() : "null"));
+      System.out.println("Invoice items count: " + "checking items...");
       
       // Direkt die Invoice übergeben (ohne ZUGFeRDTransaction)
       exporter.setTransaction(inv);

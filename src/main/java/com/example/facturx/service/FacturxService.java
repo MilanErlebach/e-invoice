@@ -48,14 +48,16 @@ public class FacturxService {
          .setIssueDate(java.sql.Date.valueOf(issue))
          .setCurrency(dto.header != null && dto.header.currency != null ? dto.header.currency : "EUR");
 
-      // Leistungszeitraum
-      if (dto.header != null && (notBlank(dto.header.serviceFrom) || notBlank(dto.header.serviceTo))) {
+      // Leistungszeitraum - only set if both dates are valid
+      if (dto.header != null && notBlank(dto.header.serviceFrom) && notBlank(dto.header.serviceTo)) {
         LocalDate from = parseDate(dto.header.serviceFrom);
         LocalDate to   = parseDate(dto.header.serviceTo);
-        inv.setDetailedDeliveryPeriod(
-            from != null ? java.sql.Date.valueOf(from) : null,
-            to   != null ? java.sql.Date.valueOf(to)   : null
-        );
+        if (from != null && to != null) {
+          inv.setDetailedDeliveryPeriod(
+              java.sql.Date.valueOf(from),
+              java.sql.Date.valueOf(to)
+          );
+        }
       }
 
       // Fälligkeit + Text

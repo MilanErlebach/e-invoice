@@ -39,9 +39,13 @@ public class FacturxService {
 
       // --- Header ---
       String invNumber = dto.header.number;
-      LocalDate issue = parseDate(dto.header.issueDate);
+      LocalDate issue = parseDate(dto.header != null ? dto.header.issueDate : null);
+      if (issue == null) {
+        // Mustang 2.19 requires a non-null issue date; fallback to today if not provided
+        issue = LocalDate.now();
+      }
       inv.setNumber(invNumber)
-         .setIssueDate(issue != null ? java.sql.Date.valueOf(issue) : null)
+         .setIssueDate(java.sql.Date.valueOf(issue))
          .setCurrency(dto.header.currency != null ? dto.header.currency : "EUR");
 
       // Leistungszeitraum

@@ -38,7 +38,7 @@ public class FacturxService {
       Invoice inv = new Invoice();
 
       // --- Header ---
-      String invNumber = dto.header.number;
+      String invNumber = dto.header != null ? dto.header.number : "INV-001";
       LocalDate issue = parseDate(dto.header != null ? dto.header.issueDate : null);
       if (issue == null) {
         // Mustang 2.19 requires a non-null issue date; fallback to today if not provided
@@ -46,10 +46,10 @@ public class FacturxService {
       }
       inv.setNumber(invNumber)
          .setIssueDate(java.sql.Date.valueOf(issue))
-         .setCurrency(dto.header.currency != null ? dto.header.currency : "EUR");
+         .setCurrency(dto.header != null && dto.header.currency != null ? dto.header.currency : "EUR");
 
       // Leistungszeitraum
-      if (notBlank(dto.header.serviceFrom) || notBlank(dto.header.serviceTo)) {
+      if (dto.header != null && (notBlank(dto.header.serviceFrom) || notBlank(dto.header.serviceTo))) {
         LocalDate from = parseDate(dto.header.serviceFrom);
         LocalDate to   = parseDate(dto.header.serviceTo);
         inv.setDetailedDeliveryPeriod(
@@ -59,10 +59,12 @@ public class FacturxService {
       }
 
       // Fälligkeit + Text
-      if (notBlank(dto.header.dueDate)) {
+      if (dto.header != null && notBlank(dto.header.dueDate)) {
         LocalDate due = parseDate(dto.header.dueDate);
-        inv.setDueDate(java.sql.Date.valueOf(due));
-        inv.setPaymentTermDescription("Please remit until " + formatDE(due));
+        if (due != null) {
+          inv.setDueDate(java.sql.Date.valueOf(due));
+          inv.setPaymentTermDescription("Please remit until " + formatDE(due));
+        }
       }
 
       // --- Parteien ---

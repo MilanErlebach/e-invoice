@@ -198,6 +198,12 @@ public class FacturxService {
             .setCreator("Mustangproject");
       }
 
+      // Debug: Check invoice dates before setting transaction
+      System.out.println("Invoice issue date: " + inv.getIssueDate());
+      System.out.println("Invoice due date: " + inv.getDueDate());
+      System.out.println("Invoice delivery period from: " + inv.getDeliveryPeriodStart());
+      System.out.println("Invoice delivery period to: " + inv.getDeliveryPeriodEnd());
+      
       // Direkt die Invoice übergeben (ohne ZUGFeRDTransaction)
       exporter.setTransaction(inv);
 

@@ -6,3 +6,7 @@ target/
 *.log
 *.pdf
 
+
+# editor backups
+*.bak*
+

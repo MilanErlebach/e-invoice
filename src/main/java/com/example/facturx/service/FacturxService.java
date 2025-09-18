@@ -394,7 +394,7 @@ public class FacturxService {
           continue;
         }
         
-        // Berechne Netto-Betrag für diese Zeile (ohne Rundung)
+        // Berechne Netto-Betrag für diese Zeile
         BigDecimal lineNet = unitNet.multiply(qty);
         
         // Positionsrabatt berücksichtigen
@@ -406,10 +406,14 @@ public class FacturxService {
           }
         }
         
-        // Berechne Brutto-Betrag für diese Zeile (ohne Rundung)
-        BigDecimal lineGross = lineNet.multiply(BigDecimal.ONE.add(vatPct.movePointLeft(2)));
+        // WICHTIG: Runde jede Zeile auf 2 Dezimalstellen (wie in der E-Rechnung)
+        lineNet = lineNet.setScale(2, RoundingMode.HALF_UP);
         
-        // Addiere zu Gesamtsummen (ohne Rundung)
+        // Berechne Brutto-Betrag für diese Zeile
+        BigDecimal lineGross = lineNet.multiply(BigDecimal.ONE.add(vatPct.movePointLeft(2)));
+        lineGross = lineGross.setScale(2, RoundingMode.HALF_UP);
+        
+        // Addiere zu Gesamtsummen
         totalNetAmount = totalNetAmount.add(lineNet);
         totalGrossAmount = totalGrossAmount.add(lineGross);
         

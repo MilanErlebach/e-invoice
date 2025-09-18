@@ -48,6 +48,17 @@ public class FacturxService {
          .setIssueDate(java.sql.Date.valueOf(issue))
          .setCurrency(dto.header != null && dto.header.currency != null ? dto.header.currency : "EUR")
          .setDeliveryDate(java.sql.Date.valueOf(issue)); // Set delivery date to issue date as fallback
+      
+      // Explicitly set document type to invoice (TypeCode 220)
+      // This ensures we generate an invoice, not a despatch advice
+      try {
+        // Try to set the document type using reflection if the method exists
+        java.lang.reflect.Method setTypeCodeMethod = inv.getClass().getMethod("setTypeCode", String.class);
+        setTypeCodeMethod.invoke(inv, "220"); // 220 = Invoice
+        System.out.println("Set document type code to 220 (Invoice)");
+      } catch (Exception e) {
+        System.out.println("Could not set document type code (method may not exist): " + e.getMessage());
+      }
 
       // Leistungszeitraum - only set if both dates are valid
       if (dto.header != null && notBlank(dto.header.serviceFrom) && notBlank(dto.header.serviceTo)) {

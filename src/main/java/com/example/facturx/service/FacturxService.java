@@ -6,9 +6,9 @@ import com.example.facturx.model.InvoiceDTO.PartyDTO;
 import org.mustangproject.*;
 import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromPDFA;
 import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromA1;
+import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromA3;
 import org.mustangproject.ZUGFeRD.Profiles;
 import org.mustangproject.ZUGFeRD.IZUGFeRDExporter;
-import org.mustangproject.ZUGFeRD.DXExporterFromA3;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -193,42 +193,27 @@ public class FacturxService {
         inv.addItem(item);
       }
       
-      // 3) Exporter: Try different exporters for proper invoice generation
-      // Priority: ZUGFeRDExporterFromA1 (for invoices) -> ZUGFeRDExporterFromPDFA -> DXExporterFromA3
+      // 3) Exporter: Try ZUGFeRDExporterFromPDFA first, fallback to ZUGFeRDExporterFromA3 for invoices
+      // CRITICAL: Use ZUGFeRDExporterFromA3 (not DXExporterFromA3) for proper invoice generation
       IZUGFeRDExporter exporter;
       try {
-        System.out.println("Attempting to use ZUGFeRDExporterFromA1 for invoice generation...");
-        exporter = new ZUGFeRDExporterFromA1()
+        System.out.println("Attempting to use ZUGFeRDExporterFromPDFA for invoice generation...");
+        exporter = new ZUGFeRDExporterFromPDFA()
             .load(tmpPdf.getAbsolutePath())
             .setZUGFeRDVersion(2)
             .setProfile(Profiles.getByName("EN16931"))
             .setProducer("FacturX-Converter")
             .setCreator("Mustangproject");
-        System.out.println("Successfully loaded PDF with ZUGFeRDExporterFromA1");
-      } catch (Exception e) {
-        System.out.println("ZUGFeRDExporterFromA1 failed, trying ZUGFeRDExporterFromPDFA...");
-        try {
-          exporter = new ZUGFeRDExporterFromPDFA()
-              .load(tmpPdf.getAbsolutePath())
-              .setZUGFeRDVersion(2)
-              .setProfile(Profiles.getByName("EN16931"))
-              .setProducer("FacturX-Converter")
-              .setCreator("Mustangproject");
-          System.out.println("Successfully loaded PDF with ZUGFeRDExporterFromPDFA");
-        } catch (IllegalArgumentException e2) {
-          if (e2.getMessage().contains("PDF-A version not supported")) {
-            System.out.println("Source PDF is not PDF/A compliant, falling back to DXExporterFromA3...");
-            exporter = new DXExporterFromA3()
-                .load(tmpPdf.getAbsolutePath())
-                .setZUGFeRDVersion(2)
-                .setProfile(Profiles.getByName("EN16931"))
-                .setProducer("FacturX-Converter")
-                .setCreator("Mustangproject");
-            System.out.println("Successfully loaded PDF with DXExporterFromA3 (will convert to PDF/A-3)");
-          } else {
-            throw e2; // Re-throw if it's a different error
-          }
-        }
+        System.out.println("Successfully loaded PDF with ZUGFeRDExporterFromPDFA");
+      } catch (IllegalArgumentException | IOException e) {
+        System.out.println("ZUGFeRDExporterFromPDFA failed, falling back to ZUGFeRDExporterFromA3 for invoice generation...");
+        exporter = new ZUGFeRDExporterFromA3()
+            .load(tmpPdf.getAbsolutePath())
+            .setZUGFeRDVersion(2)
+            .setProfile(Profiles.getByName("EN16931"))
+            .setProducer("FacturX-Converter")
+            .setCreator("Mustangproject");
+        System.out.println("Successfully loaded PDF with ZUGFeRDExporterFromA3 (will convert to PDF/A-3 and generate invoice)");
       }
 
       // Debug: Check invoice dates before setting transaction
@@ -268,26 +253,8 @@ public class FacturxService {
         inv.setCurrency("EUR");
       }
       
-      // Try to set document type using ZUGFeRDTransaction wrapper
-      // This might help ensure proper invoice generation
-      try {
-        // Import ZUGFeRDTransaction if available
-        Class<?> transactionClass = Class.forName("org.mustangproject.ZUGFeRD.ZUGFeRDTransaction");
-        Object transaction = transactionClass.getConstructor(Invoice.class).newInstance(inv);
-        
-        // Try to set document type on transaction
-        java.lang.reflect.Method setTypeCodeMethod = transactionClass.getMethod("setTypeCode", String.class);
-        setTypeCodeMethod.invoke(transaction, "220"); // 220 = Invoice
-        System.out.println("Set document type code to 220 (Invoice) using ZUGFeRDTransaction");
-        
-        // Use transaction instead of invoice directly
-        exporter.setTransaction((org.mustangproject.ZUGFeRD.IExportableTransaction) transaction);
-        System.out.println("Using ZUGFeRDTransaction for invoice generation");
-      } catch (Exception e) {
-        System.out.println("Could not use ZUGFeRDTransaction, falling back to direct Invoice: " + e.getMessage());
-        // Fallback to direct invoice
-        exporter.setTransaction(inv);
-      }
+      // Set the invoice transaction directly - ZUGFeRDExporterFromA3 will generate proper invoice XML
+      exporter.setTransaction(inv);
 
       ByteArrayOutputStream bos = new ByteArrayOutputStream();
       exporter.export(bos);

@@ -379,6 +379,7 @@ public class FacturxService {
       // WICHTIG: Berechne erst die Gesamtsumme, dann runde (vermeidet Rundungsfehler)
       BigDecimal totalNetAmount = BigDecimal.ZERO;
       BigDecimal totalGrossAmount = BigDecimal.ZERO;
+      BigDecimal mostCommonVatRate = BigDecimal.ZERO;
       
       for (Line line : lines) {
         if (!notBlank(line.description) || !notBlank(line.quantity)) {
@@ -417,12 +418,24 @@ public class FacturxService {
         totalNetAmount = totalNetAmount.add(lineNet);
         totalGrossAmount = totalGrossAmount.add(lineGross);
         
+        // Speichere die häufigste MwSt-Rate (für die Gesamtberechnung)
+        if (vatPct.compareTo(mostCommonVatRate) > 0) {
+          mostCommonVatRate = vatPct;
+        }
+        
         System.out.println("DEBUG: Line " + line.description + " -> Net: " + lineNet + ", Gross: " + lineGross);
       }
       
-      // Runde die Gesamtsummen auf 2 Dezimalstellen
+      // Runde die Netto-Gesamtsumme auf 2 Dezimalstellen
       BigDecimal actualNetTotal = totalNetAmount.setScale(2, RoundingMode.HALF_UP);
-      BigDecimal actualGrossTotal = totalGrossAmount.setScale(2, RoundingMode.HALF_UP);
+      
+      // WICHTIG: Berechne Brutto-Gesamtsumme aus der gerundeten Netto-Gesamtsumme
+      // Verwende die häufigste MwSt-Rate (Standard: 19% falls keine gefunden)
+      if (mostCommonVatRate.compareTo(BigDecimal.ZERO) == 0) {
+        mostCommonVatRate = new BigDecimal("19");
+      }
+      BigDecimal actualGrossTotal = actualNetTotal.multiply(BigDecimal.ONE.add(mostCommonVatRate.movePointLeft(2)));
+      actualGrossTotal = actualGrossTotal.setScale(2, RoundingMode.HALF_UP);
       
       System.out.println("DEBUG: Total Net: " + actualNetTotal + ", Total Gross: " + actualGrossTotal);
       

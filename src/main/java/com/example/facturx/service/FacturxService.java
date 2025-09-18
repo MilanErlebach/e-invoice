@@ -166,12 +166,33 @@ public class FacturxService {
         preps.add(p);
       }
 
-      // --- Items hinzufügen (verwende 2-Dezimalstellen-Preise wie die Mustang Library) ---
+      // --- Items hinzufügen (korrigiere Einzelpreise für korrekte Positionssummen) ---
       for (Prep p : preps) {
         String unit = notBlank(p.src.unitCode) ? p.src.unitCode : "C62";
         
-        // Verwende die ursprünglichen Einzelpreise (2 Dezimalstellen)
-        BigDecimal unitNet = p.src.unitNetPriceBD().setScale(2, RoundingMode.HALF_UP);
+        // Berechne die gewünschte Positionssumme (wie in der Rundungsberechnung)
+        BigDecimal originalUnitNet = p.src.unitNetPriceBD();
+        BigDecimal lineNet = originalUnitNet.multiply(p.qty).setScale(2, RoundingMode.HALF_UP);
+        
+        // Positionsrabatt berücksichtigen
+        if (notBlank(p.src.discount)) {
+          BigDecimal discNet = bd2(p.src.discount);
+          if (discNet.compareTo(BigDecimal.ZERO) > 0) {
+            lineNet = lineNet.subtract(discNet).setScale(2, RoundingMode.HALF_UP);
+            if (lineNet.compareTo(BigDecimal.ZERO) < 0) lineNet = BigDecimal.ZERO;
+          }
+        }
+        
+        // Berechne Einzelpreis so, dass Mustang Library auf die gewünschte Positionssumme kommt
+        // Mustang Library berechnet: (Einzelpreis × Menge) × (1 + MwSt)
+        // Wir wollen: Positionssumme × (1 + MwSt)
+        // Also: Einzelpreis = Positionssumme / Menge
+        BigDecimal adjustedUnitNet = lineNet.divide(p.qty, 2, RoundingMode.HALF_UP);
+        
+        System.out.println("DEBUG: Line " + p.src.description + 
+                          " - Original unit net: " + originalUnitNet + 
+                          ", Target line net: " + lineNet + 
+                          ", Adjusted unit net: " + adjustedUnitNet);
 
         Product prod = new Product();
         prod.setName(p.src.description)
@@ -181,7 +202,7 @@ public class FacturxService {
           prod.setTaxCategoryCode(p.src.taxCategory);
         }
 
-        Item item = new Item(prod, unitNet, p.qty);
+        Item item = new Item(prod, adjustedUnitNet, p.qty);
 
         // Positions-Rabatt (netto)
         if (notBlank(p.src.discount)) {

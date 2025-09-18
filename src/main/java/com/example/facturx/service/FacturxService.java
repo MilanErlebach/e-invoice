@@ -183,11 +183,12 @@ public class FacturxService {
           }
         }
         
-        // Berechne Einzelpreis so, dass Mustang Library auf die gewünschte Positionssumme kommt
+        // Berechne Einzelpreis so, dass Mustang Library auf die gewünschte Brutto-Positionssumme kommt
         // Mustang Library berechnet: (Einzelpreis × Menge) × (1 + MwSt)
-        // Wir wollen: Positionssumme × (1 + MwSt)
-        // Also: Einzelpreis = Positionssumme / Menge
-        BigDecimal adjustedUnitNet = lineNet.divide(p.qty, 2, RoundingMode.HALF_UP);
+        // Wir wollen: Brutto-Positionssumme = Netto-Positionssumme × (1 + MwSt)
+        // Also: Einzelpreis = Brutto-Positionssumme / (Menge × (1 + MwSt))
+        BigDecimal targetGrossLine = lineNet.multiply(BigDecimal.ONE.add(p.vatPct.movePointLeft(2))).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal adjustedUnitNet = targetGrossLine.divide(p.qty.multiply(BigDecimal.ONE.add(p.vatPct.movePointLeft(2))), 2, RoundingMode.HALF_UP);
         
         System.out.println("DEBUG: Line " + p.src.description + 
                           " - Original unit net: " + originalUnitNet + 

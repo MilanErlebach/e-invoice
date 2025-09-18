@@ -3,6 +3,7 @@ package com.example.facturx.service;
 import com.example.facturx.model.InvoiceDTO;
 import com.example.facturx.model.InvoiceDTO.Line;
 import com.example.facturx.model.InvoiceDTO.PartyDTO;
+import com.example.facturx.model.InvoiceDTO.TotalsDTO;
 import org.mustangproject.*;
 import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromPDFA;
 import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromA1;

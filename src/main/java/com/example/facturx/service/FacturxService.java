@@ -7,6 +7,8 @@ import com.example.facturx.model.InvoiceDTO.TotalsDTO;
 import org.mustangproject.*;
 import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromPDFA;
 import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromA1;
+
+
 import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromA3;
 import org.mustangproject.ZUGFeRD.Profiles;
 import org.mustangproject.ZUGFeRD.IZUGFeRDExporter;
@@ -417,7 +419,7 @@ public class FacturxService {
       System.out.println("DEBUG: Gross delta: " + grossDelta);
       
       // Wenn es eine signifikante Differenz gibt, füge einen Rundungsausgleich hinzu
-      if (grossDelta.abs().compareTo(new BigDecimal("0.005")) >= 0) {
+      if (grossDelta.abs().compareTo(new BigDecimal("0.001")) >= 0) {
         System.out.println("DEBUG: Applying gross total adjustment: " + grossDelta);
         
         // Verwende die häufigste MwSt-Rate (19%) für den Ausgleich

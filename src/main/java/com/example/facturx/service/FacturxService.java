@@ -193,30 +193,42 @@ public class FacturxService {
       if (dto.totals != null && notBlank(dto.totals.discountGross)) {
         BigDecimal invoiceDiscount = bd2(dto.totals.discountGross);
         if (invoiceDiscount.compareTo(BigDecimal.ZERO) > 0) {
-          ArrayList<Allowance> invoiceAllowances = new ArrayList<>();
-          invoiceAllowances.add(new Allowance(invoiceDiscount));
-          inv.setAllowances(invoiceAllowances);
+          // Add as a separate line item with negative amount
+          Product discountProd = new Product();
+          discountProd.setName("Discount")
+                      .setUnit("C62")
+                      .setVATPercent(BigDecimal.ZERO);
+          
+          Item discountItem = new Item(discountProd, BigDecimal.ONE, invoiceDiscount.negate());
+          inv.addItem(discountItem);
+          System.out.println("Adding invoice discount: " + invoiceDiscount);
         }
       }
       
-      // Add negative price lines as allowances (credits)
-      ArrayList<Allowance> negativePriceAllowances = new ArrayList<>();
+      // Add negative price lines as separate line items with negative amounts
       for (Line l : dto.lines) {
         if (notBlank(l.description) && notBlank(l.quantity)) {
           BigDecimal qty = bd4(l.quantity);
           BigDecimal unitNet = l.unitNetPriceBD();
           
           if (unitNet.compareTo(BigDecimal.ZERO) < 0) {
-            // Convert negative price to positive allowance
-            BigDecimal creditAmount = unitNet.abs().multiply(qty);
-            negativePriceAllowances.add(new Allowance(creditAmount));
-            System.out.println("Adding credit allowance: " + l.description + " = " + creditAmount);
+            // Add as a separate line item with negative amount
+            String unit = notBlank(l.unitCode) ? l.unitCode : "C62";
+            BigDecimal vatPct = bd2(defaultIfBlank(l.taxRate, "0"));
+            
+            Product creditProd = new Product();
+            creditProd.setName(l.description + " (Credit)")
+                      .setUnit(unit)
+                      .setVATPercent(vatPct);
+            if (notBlank(l.taxCategory)) {
+              creditProd.setTaxCategoryCode(l.taxCategory);
+            }
+            
+            Item creditItem = new Item(creditProd, qty, unitNet.abs().negate());
+            inv.addItem(creditItem);
+            System.out.println("Adding credit line item: " + l.description + " = " + unitNet.abs().multiply(qty));
           }
         }
-      }
-      
-      if (!negativePriceAllowances.isEmpty()) {
-        inv.setAllowances(negativePriceAllowances);
       }
       
       // 3) Exporter: Try ZUGFeRDExporterFromPDFA first, fallback to ZUGFeRDExporterFromA3 for invoices

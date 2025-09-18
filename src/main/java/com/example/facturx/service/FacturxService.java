@@ -190,14 +190,32 @@ public class FacturxService {
         inv.addItem(item);
       }
       
-      // 3) Exporter: Use ZUGFeRDExporterFromPDFA for proper invoice generation
-      // This is the correct exporter for invoices (not despatch advice)
-      IZUGFeRDExporter exporter = new ZUGFeRDExporterFromPDFA()
-          .load(tmpPdf.getAbsolutePath())
-          .setZUGFeRDVersion(2)
-          .setProfile(Profiles.getByName("EN16931"))
-          .setProducer("FacturX-Converter")
-          .setCreator("Mustangproject");
+      // 3) Exporter: Try ZUGFeRDExporterFromPDFA first (for proper invoice generation)
+      // If source PDF is not PDF/A compliant, fallback to DXExporterFromA3
+      IZUGFeRDExporter exporter;
+      try {
+        System.out.println("Attempting to use ZUGFeRDExporterFromPDFA for invoice generation...");
+        exporter = new ZUGFeRDExporterFromPDFA()
+            .load(tmpPdf.getAbsolutePath())
+            .setZUGFeRDVersion(2)
+            .setProfile(Profiles.getByName("EN16931"))
+            .setProducer("FacturX-Converter")
+            .setCreator("Mustangproject");
+        System.out.println("Successfully loaded PDF with ZUGFeRDExporterFromPDFA");
+      } catch (IllegalArgumentException e) {
+        if (e.getMessage().contains("PDF-A version not supported")) {
+          System.out.println("Source PDF is not PDF/A compliant, falling back to DXExporterFromA3...");
+          exporter = new DXExporterFromA3()
+              .load(tmpPdf.getAbsolutePath())
+              .setZUGFeRDVersion(2)
+              .setProfile(Profiles.getByName("EN16931"))
+              .setProducer("FacturX-Converter")
+              .setCreator("Mustangproject");
+          System.out.println("Successfully loaded PDF with DXExporterFromA3 (will convert to PDF/A-3)");
+        } else {
+          throw e; // Re-throw if it's a different error
+        }
+      }
 
       // Debug: Check invoice dates before setting transaction
       System.out.println("Invoice issue date: " + inv.getIssueDate());

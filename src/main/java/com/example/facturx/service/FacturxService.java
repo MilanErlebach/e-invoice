@@ -19,7 +19,9 @@ import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class FacturxService {
@@ -231,6 +233,9 @@ public class FacturxService {
         }
       }
       
+      // --- Rundungsausgleich je MwSt-Kategorie ---
+      applyRoundingAdjustment(inv, dto.lines);
+      
       // 3) Exporter: Try ZUGFeRDExporterFromPDFA first, fallback to ZUGFeRDExporterFromA3 for invoices
       // CRITICAL: Use ZUGFeRDExporterFromA3 (not DXExporterFromA3) for proper invoice generation
       IZUGFeRDExporter exporter;
@@ -349,5 +354,190 @@ public class FacturxService {
   private static String formatDE(LocalDate d) {
     if (d == null) return null;
     return String.format("%02d.%02d.%04d", d.getDayOfMonth(), d.getMonthValue(), d.getYear());
+  }
+
+  /**
+   * Wendet Rundungsausgleich je MwSt-Kategorie an, um Differenzen zwischen
+   * Brutto→Netto Umrechnung zu eliminieren.
+   */
+  private static void applyRoundingAdjustment(Invoice inv, List<Line> lines) {
+    if (lines == null || lines.isEmpty()) {
+      return;
+    }
+
+    System.out.println("DEBUG: Starting rounding adjustment analysis...");
+
+    // 1) Analyse je MwSt-Kategorie: Summiere Bruttos und berechne Soll-Netto
+    Map<String, VatCategoryInfo> vatCategories = new HashMap<>();
+    
+    for (Line line : lines) {
+      if (!notBlank(line.description) || !notBlank(line.quantity)) {
+        continue;
+      }
+      
+      BigDecimal qty = bd4(line.quantity);
+      BigDecimal vatPct = bd2(defaultIfBlank(line.taxRate, "0"));
+      BigDecimal unitNet = line.unitNetPriceBD();
+      
+      // Skip negative prices (already handled as credit items)
+      if (unitNet.compareTo(BigDecimal.ZERO) < 0) {
+        continue;
+      }
+      
+      String vatKey = vatPct.toString() + "_" + defaultIfBlank(line.taxCategory, "S");
+      
+      VatCategoryInfo info = vatCategories.computeIfAbsent(vatKey, k -> {
+        VatCategoryInfo newInfo = new VatCategoryInfo();
+        newInfo.vatPercent = vatPct;
+        newInfo.taxCategory = defaultIfBlank(line.taxCategory, "S");
+        return newInfo;
+      });
+      
+      // Brutto zur Kategorie-Summe hinzufügen
+      BigDecimal unitGross = unitNet.multiply(BigDecimal.ONE.add(vatPct.movePointLeft(2)));
+      BigDecimal lineGross = unitGross.multiply(qty);
+      
+      // Positionsrabatt berücksichtigen
+      if (notBlank(line.discount)) {
+        BigDecimal discNet = bd2(line.discount);
+        if (discNet.compareTo(BigDecimal.ZERO) > 0) {
+          BigDecimal lineNet = unitNet.multiply(qty).subtract(discNet);
+          if (lineNet.compareTo(BigDecimal.ZERO) < 0) lineNet = BigDecimal.ZERO;
+          unitNet = lineNet.divide(qty, 4, RoundingMode.HALF_UP);
+          unitGross = unitNet.multiply(BigDecimal.ONE.add(vatPct.movePointLeft(2)));
+          lineGross = unitGross.multiply(qty);
+        }
+      }
+      
+      info.grossSum = info.grossSum.add(lineGross);
+      System.out.println("DEBUG: Line " + line.description + " -> Gross: " + lineGross + ", Net: " + unitNet.multiply(qty));
+    }
+    
+    // 2) Berechne Soll-Netto und vergleiche mit Ist-Netto
+    System.out.println("DEBUG: Found " + vatCategories.size() + " VAT categories");
+    
+    for (Map.Entry<String, VatCategoryInfo> entry : vatCategories.entrySet()) {
+      VatCategoryInfo info = entry.getValue();
+      
+      System.out.println("DEBUG: Processing VAT category " + info.vatPercent + "%/" + info.taxCategory + 
+                        " with gross sum: " + info.grossSum);
+      
+      // Soll-Netto aus Brutto-Summe berechnen
+      BigDecimal targetNet = info.grossSum.divide(
+          BigDecimal.ONE.add(info.vatPercent.movePointLeft(2)), 
+          2, 
+          RoundingMode.HALF_UP
+      );
+      
+      // Ist-Netto aus bereits hinzugefügten Items berechnen
+      BigDecimal actualNet = calculateActualNetForVatCategory(inv, info.vatPercent, info.taxCategory);
+      
+      // Differenz berechnen
+      BigDecimal delta = targetNet.subtract(actualNet);
+      
+      System.out.println("DEBUG: VAT " + info.vatPercent + "% - Target Net: " + targetNet + 
+                        ", Actual Net: " + actualNet + ", Delta: " + delta);
+      
+      // Nur bei signifikanter Differenz (≥ 0.01) korrigieren
+      if (delta.abs().compareTo(new BigDecimal("0.005")) >= 0) {
+        BigDecimal adjustmentAmount = delta.setScale(2, RoundingMode.HALF_UP);
+        
+        System.out.println("DEBUG: Applying rounding adjustment: " + adjustmentAmount);
+        
+        // 3) Korrektur anwenden
+        if (adjustmentAmount.compareTo(BigDecimal.ZERO) > 0) {
+          // Positive Differenz: Allowance (Rabatt) hinzufügen
+          addRoundingAdjustment(inv, info, adjustmentAmount, true);
+        } else {
+          // Negative Differenz: Charge (Zuschlag) hinzufügen
+          addRoundingAdjustment(inv, info, adjustmentAmount.abs(), false);
+        }
+      } else {
+        System.out.println("DEBUG: No rounding adjustment needed for VAT " + info.vatPercent + "%");
+      }
+    }
+  }
+  
+  /**
+   * Berechnet das tatsächliche Netto für eine MwSt-Kategorie aus den bereits hinzugefügten Items.
+   */
+  private static BigDecimal calculateActualNetForVatCategory(Invoice inv, BigDecimal vatPercent, String taxCategory) {
+    BigDecimal actualNet = BigDecimal.ZERO;
+    
+    // Durchlaufe alle Items der Rechnung
+    for (Item item : inv.getItems()) {
+      if (item.getProduct() != null && 
+          item.getProduct().getVATPercent() != null &&
+          item.getProduct().getVATPercent().compareTo(vatPercent) == 0) {
+        
+        // Prüfe auch TaxCategory falls vorhanden
+        if (taxCategory == null || 
+            item.getProduct().getTaxCategoryCode() == null ||
+            item.getProduct().getTaxCategoryCode().equals(taxCategory)) {
+          
+          BigDecimal itemNet = item.getPrice().multiply(item.getQuantity());
+          
+          // Berücksichtige Item-Level Allowances
+          if (item.getItemAllowances() != null) {
+            for (Allowance allowance : item.getItemAllowances()) {
+              itemNet = itemNet.subtract(allowance.getAmount());
+            }
+          }
+          
+          actualNet = actualNet.add(itemNet);
+        }
+      }
+    }
+    
+    return actualNet;
+  }
+  
+  /**
+   * Fügt einen Rundungsausgleich als Allowance/Charge oder Fallback-Item hinzu.
+   */
+  private static void addRoundingAdjustment(Invoice inv, VatCategoryInfo info, BigDecimal amount, boolean isAllowance) {
+    try {
+      // Versuche zuerst Document-level Allowance/Charge
+      if (isAllowance) {
+        Allowance allowance = new Allowance(amount);
+        allowance.setReason("Rundungsausgleich");
+        inv.addAllowance(allowance);
+        System.out.println("INFO: Rundungsausgleich hinzugefügt - Kategorie: " + info.vatPercent + "%/" + info.taxCategory + 
+                          ", Delta: -" + amount + " EUR, Methode: Allowance");
+      } else {
+        Charge charge = new Charge(amount);
+        charge.setReason("Rundungsausgleich");
+        inv.addCharge(charge);
+        System.out.println("INFO: Rundungsausgleich hinzugefügt - Kategorie: " + info.vatPercent + "%/" + info.taxCategory + 
+                          ", Delta: +" + amount + " EUR, Methode: Charge");
+      }
+    } catch (Exception e) {
+      // Fallback: Item-basierter Rundungsausgleich
+      System.out.println("WARN: Document-level Allowance/Charge nicht unterstützt, verwende Fallback-Item");
+      
+      Product adjustmentProd = new Product();
+      adjustmentProd.setName("Rundungsausgleich")
+                   .setUnit("C62")
+                   .setVATPercent(info.vatPercent);
+      if (info.taxCategory != null) {
+        adjustmentProd.setTaxCategoryCode(info.taxCategory);
+      }
+      
+      BigDecimal itemAmount = isAllowance ? amount.negate() : amount;
+      Item adjustmentItem = new Item(adjustmentProd, itemAmount, BigDecimal.ONE);
+      inv.addItem(adjustmentItem);
+      
+      System.out.println("INFO: Rundungsausgleich hinzugefügt - Kategorie: " + info.vatPercent + "%/" + info.taxCategory + 
+                        ", Delta: " + (isAllowance ? "-" : "+") + amount + " EUR, Methode: Fallback-Item");
+    }
+  }
+  
+  /**
+   * Hilfsklasse für MwSt-Kategorie-Informationen.
+   */
+  private static class VatCategoryInfo {
+    BigDecimal vatPercent = BigDecimal.ZERO;
+    String taxCategory = "S";
+    BigDecimal grossSum = BigDecimal.ZERO;
   }
 }

@@ -166,11 +166,11 @@ public class FacturxService {
         preps.add(p);
       }
 
-      // --- Items hinzufügen (verwende 4-Dezimalstellen-Preise für Konsistenz) ---
+      // --- Items hinzufügen (korrigiere Einzelpreise für konsistente XML-Totals) ---
       for (Prep p : preps) {
         String unit = notBlank(p.src.unitCode) ? p.src.unitCode : "C62";
         
-        // Berechne den 4-Dezimalstellen-Preis (wie in der Rundungsberechnung)
+        // Berechne den gewünschten Zeilen-Nettobetrag (4 Dezimalstellen)
         BigDecimal unitNet = p.src.unitNetPriceBD();
         BigDecimal lineNet = unitNet.multiply(p.qty);
         
@@ -183,9 +183,18 @@ public class FacturxService {
           }
         }
         
-        // Verwende 4 Dezimalstellen für Konsistenz
+        // Gewünschter Zeilen-Nettobetrag (4 Dezimalstellen)
         lineNet = lineNet.setScale(4, RoundingMode.HALF_UP);
-        BigDecimal unitNet4Dec = lineNet.divide(p.qty, 4, RoundingMode.HALF_UP);
+        
+        // Berechne Einzelpreis so, dass Mustang Library auf den gewünschten Zeilenbetrag kommt
+        // Mustang Library rundet intern auf 2 Dezimalstellen, also müssen wir das berücksichtigen
+        BigDecimal targetLineNet = lineNet.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal adjustedUnitNet = targetLineNet.divide(p.qty, 4, RoundingMode.HALF_UP);
+        
+        System.out.println("DEBUG: Line " + p.src.description + 
+                          " - Original unit net: " + unitNet + 
+                          ", Target line net: " + targetLineNet + 
+                          ", Adjusted unit net: " + adjustedUnitNet);
 
         Product prod = new Product();
         prod.setName(p.src.description)
@@ -195,7 +204,7 @@ public class FacturxService {
           prod.setTaxCategoryCode(p.src.taxCategory);
         }
 
-        Item item = new Item(prod, unitNet4Dec, p.qty);
+        Item item = new Item(prod, adjustedUnitNet, p.qty);
 
         // Positions-Rabatt (netto)
         if (notBlank(p.src.discount)) {
@@ -524,6 +533,7 @@ public class FacturxService {
                       ", Delta: " + (isAllowance ? "-" : "+") + amount + " EUR, Methode: Fallback-Item");
   }
   
+
   /**
    * Hilfsklasse für MwSt-Kategorie-Informationen.
    */

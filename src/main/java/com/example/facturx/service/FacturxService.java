@@ -190,11 +190,9 @@ public class FacturxService {
         inv.addItem(item);
       }
       
-      // 3) Exporter mit Fallback:
-      //    a) Versuche strikt über ZUGFeRDExporterFromPDFA (nur wenn Quell-PDF bereits PDF/A ist)
-      //    b) Fallback auf DXExporterFromA3 (konvertiert "normales" PDF zu PDF/A-3B)
-      // Always convert to PDF/A-3 and embed XML using DXExporterFromA3
-      IZUGFeRDExporter exporter = new DXExporterFromA3()
+      // 3) Exporter: Use ZUGFeRDExporterFromPDFA for proper invoice generation
+      // This is the correct exporter for invoices (not despatch advice)
+      IZUGFeRDExporter exporter = new ZUGFeRDExporterFromPDFA()
           .load(tmpPdf.getAbsolutePath())
           .setZUGFeRDVersion(2)
           .setProfile(Profiles.getByName("EN16931"))
@@ -224,6 +222,18 @@ public class FacturxService {
         System.out.println("WARNING: Due date is null, setting to issue date + 14 days");
         LocalDate dueDate = LocalDate.now().plusDays(14);
         inv.setDueDate(java.sql.Date.valueOf(dueDate));
+      }
+      
+      // Ensure we have a valid invoice number
+      if (inv.getNumber() == null || inv.getNumber().trim().isEmpty()) {
+        System.out.println("WARNING: Invoice number is null or empty, setting default");
+        inv.setNumber("INV-" + System.currentTimeMillis());
+      }
+      
+      // Ensure we have a valid currency
+      if (inv.getCurrency() == null || inv.getCurrency().trim().isEmpty()) {
+        System.out.println("WARNING: Currency is null or empty, setting to EUR");
+        inv.setCurrency("EUR");
       }
       
       // Direkt die Invoice übergeben (ohne ZUGFeRDTransaction)

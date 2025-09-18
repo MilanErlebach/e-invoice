@@ -407,12 +407,12 @@ public class FacturxService {
           }
         }
         
-        // WICHTIG: Runde jede Zeile auf 2 Dezimalstellen (wie in der E-Rechnung)
-        lineNet = lineNet.setScale(2, RoundingMode.HALF_UP);
+        // WICHTIG: Verwende 4 Dezimalstellen für präzise Berechnungen (keine Rundung hier!)
+        lineNet = lineNet.setScale(4, RoundingMode.HALF_UP);
         
-        // Berechne Brutto-Betrag für diese Zeile
+        // Berechne Brutto-Betrag für diese Zeile (mit 4 Dezimalstellen)
         BigDecimal lineGross = lineNet.multiply(BigDecimal.ONE.add(vatPct.movePointLeft(2)));
-        lineGross = lineGross.setScale(2, RoundingMode.HALF_UP);
+        lineGross = lineGross.setScale(4, RoundingMode.HALF_UP);
         
         // Addiere zu Gesamtsummen
         totalNetAmount = totalNetAmount.add(lineNet);
@@ -426,15 +426,15 @@ public class FacturxService {
         System.out.println("DEBUG: Line " + line.description + " -> Net: " + lineNet + ", Gross: " + lineGross);
       }
       
-      // Runde die Netto-Gesamtsumme auf 2 Dezimalstellen
+      // Runde die Netto-Gesamtsumme auf 2 Dezimalstellen (nur für Anzeige)
       BigDecimal actualNetTotal = totalNetAmount.setScale(2, RoundingMode.HALF_UP);
       
-      // WICHTIG: Berechne Brutto-Gesamtsumme aus der gerundeten Netto-Gesamtsumme
+      // WICHTIG: Berechne Brutto-Gesamtsumme aus der präzisen Netto-Gesamtsumme (4 Dezimalstellen)
       // Verwende die häufigste MwSt-Rate (Standard: 19% falls keine gefunden)
       if (mostCommonVatRate.compareTo(BigDecimal.ZERO) == 0) {
         mostCommonVatRate = new BigDecimal("19");
       }
-      BigDecimal actualGrossTotal = actualNetTotal.multiply(BigDecimal.ONE.add(mostCommonVatRate.movePointLeft(2)));
+      BigDecimal actualGrossTotal = totalNetAmount.multiply(BigDecimal.ONE.add(mostCommonVatRate.movePointLeft(2)));
       actualGrossTotal = actualGrossTotal.setScale(2, RoundingMode.HALF_UP);
       
       System.out.println("DEBUG: Total Net: " + actualNetTotal + ", Total Gross: " + actualGrossTotal);

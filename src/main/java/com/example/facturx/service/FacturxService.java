@@ -463,12 +463,16 @@ public class FacturxService {
       // Versuche zuerst Document-level Allowance/Charge
       if (isAllowance) {
         Allowance allowance = new Allowance(amount);
+        // Set VAT percentage for the allowance
+        allowance.setVATPercent(info.vatPercent);
         // Note: setReason might not be available in this version of Mustang
         inv.addAllowance(allowance);
         System.out.println("INFO: Rundungsausgleich hinzugefügt - Kategorie: " + info.vatPercent + "%/" + info.taxCategory + 
                           ", Delta: -" + amount + " EUR, Methode: Allowance");
       } else {
         Charge charge = new Charge(amount);
+        // Set VAT percentage for the charge
+        charge.setVATPercent(info.vatPercent);
         // Note: setReason might not be available in this version of Mustang
         inv.addCharge(charge);
         System.out.println("INFO: Rundungsausgleich hinzugefügt - Kategorie: " + info.vatPercent + "%/" + info.taxCategory + 

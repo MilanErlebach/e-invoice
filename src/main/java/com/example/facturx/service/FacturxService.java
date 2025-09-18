@@ -174,7 +174,7 @@ public class FacturxService {
           prod.setTaxCategoryCode(p.src.taxCategory);
         }
 
-        Item item = new Item(prod, p.qty, unitNet);
+        Item item = new Item(prod, unitNet, p.qty);
 
         // Positions-Rabatt (netto)
         if (notBlank(p.src.discount)) {

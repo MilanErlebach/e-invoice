@@ -119,12 +119,6 @@ public class FacturxService {
         throw new IllegalArgumentException("At least one line is required");
       }
 
-      class Prep {
-        Line src;
-        BigDecimal qty;
-        BigDecimal vatPct;      // z.B. 19
-        BigDecimal unitNetOrig; // aus net_price oder aus gross_price abgeleitet
-      }
 
       List<Prep> preps = new ArrayList<>();
       BigDecimal grossSumCalc = BigDecimal.ZERO;
@@ -189,6 +183,9 @@ public class FacturxService {
         // Also: Einzelpreis = Brutto-Positionssumme / (Menge × (1 + MwSt))
         BigDecimal targetGrossLine = lineNet.multiply(BigDecimal.ONE.add(p.vatPct.movePointLeft(2))).setScale(2, RoundingMode.HALF_UP);
         BigDecimal adjustedUnitNet = targetGrossLine.divide(p.qty.multiply(BigDecimal.ONE.add(p.vatPct.movePointLeft(2))), 2, RoundingMode.HALF_UP);
+        
+        // Speichere den angepassten Einzelpreis in der Prep-Instanz
+        p.unitNetAdjusted = adjustedUnitNet;
         
         System.out.println("DEBUG: Line " + p.src.description + 
                           " - Original unit net: " + originalUnitNet + 
@@ -537,5 +534,13 @@ public class FacturxService {
     BigDecimal vatPercent = BigDecimal.ZERO;
     String taxCategory = "S";
     BigDecimal grossSum = BigDecimal.ZERO;
+  }
+
+  static class Prep {
+    Line src;
+    BigDecimal qty;
+    BigDecimal vatPct;      // z.B. 19
+    BigDecimal unitNetOrig; // aus net_price oder aus gross_price abgeleitet
+    BigDecimal unitNetAdjusted; // der angepasste Einzelpreis für Mustang
   }
 }

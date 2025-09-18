@@ -185,23 +185,13 @@ public class FacturxService {
       // 3) Exporter mit Fallback:
       //    a) Versuche strikt über ZUGFeRDExporterFromPDFA (nur wenn Quell-PDF bereits PDF/A ist)
       //    b) Fallback auf DXExporterFromA3 (konvertiert "normales" PDF zu PDF/A-3B)
-      IZUGFeRDExporter exporter;
-      try {
-        exporter = new ZUGFeRDExporterFromPDFA()
-            .ignorePDFAErrors() // toleranter bei Preflight-Warnungen, greift aber nicht bei "not supported"
-            .load(tmpPdf.getAbsolutePath())
-            .setZUGFeRDVersion(2)
-            .setProfile(Profiles.getByName("EN16931"))
-            .setProducer("FacturX-Converter")
-            .setCreator("Mustangproject");
-      } catch (IllegalArgumentException | IOException ex) {
-        exporter = new DXExporterFromA3()
-            .load(tmpPdf.getAbsolutePath())
-            .setZUGFeRDVersion(2)
-            .setProfile(Profiles.getByName("EN16931"))
-            .setProducer("FacturX-Converter")
-            .setCreator("Mustangproject");
-      }
+      // Always convert to PDF/A-3 and embed XML using DXExporterFromA3
+      IZUGFeRDExporter exporter = new DXExporterFromA3()
+          .load(tmpPdf.getAbsolutePath())
+          .setZUGFeRDVersion(2)
+          .setProfile(Profiles.getByName("EN16931"))
+          .setProducer("FacturX-Converter")
+          .setCreator("Mustangproject");
 
       // Debug: Check invoice dates before setting transaction
       System.out.println("Invoice issue date: " + inv.getIssueDate());

@@ -166,10 +166,26 @@ public class FacturxService {
         preps.add(p);
       }
 
-      // --- Items hinzufügen (ohne Skalierung - verwende Originalpreise) ---
+      // --- Items hinzufügen (verwende 4-Dezimalstellen-Preise für Konsistenz) ---
       for (Prep p : preps) {
         String unit = notBlank(p.src.unitCode) ? p.src.unitCode : "C62";
-        BigDecimal unitNet = p.unitNetOrig; // Use original price without scaling
+        
+        // Berechne den 4-Dezimalstellen-Preis (wie in der Rundungsberechnung)
+        BigDecimal unitNet = p.src.unitNetPriceBD();
+        BigDecimal lineNet = unitNet.multiply(p.qty);
+        
+        // Positionsrabatt berücksichtigen
+        if (notBlank(p.src.discount)) {
+          BigDecimal discNet = bd2(p.src.discount);
+          if (discNet.compareTo(BigDecimal.ZERO) > 0) {
+            lineNet = lineNet.subtract(discNet);
+            if (lineNet.compareTo(BigDecimal.ZERO) < 0) lineNet = BigDecimal.ZERO;
+          }
+        }
+        
+        // Verwende 4 Dezimalstellen für Konsistenz
+        lineNet = lineNet.setScale(4, RoundingMode.HALF_UP);
+        BigDecimal unitNet4Dec = lineNet.divide(p.qty, 4, RoundingMode.HALF_UP);
 
         Product prod = new Product();
         prod.setName(p.src.description)
@@ -179,7 +195,7 @@ public class FacturxService {
           prod.setTaxCategoryCode(p.src.taxCategory);
         }
 
-        Item item = new Item(prod, unitNet, p.qty);
+        Item item = new Item(prod, unitNet4Dec, p.qty);
 
         // Positions-Rabatt (netto)
         if (notBlank(p.src.discount)) {

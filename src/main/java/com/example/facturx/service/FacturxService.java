@@ -424,9 +424,16 @@ public class FacturxService {
         System.out.println("DEBUG: Line " + line.description + " -> Net: " + lineNet + ", Gross: " + lineGross);
       }
       
-      // Die Gesamtsummen sind bereits auf 2 Dezimalstellen gerundet
+      // Die Netto-Gesamtsumme ist bereits auf 2 Dezimalstellen gerundet
       BigDecimal actualNetTotal = totalNetAmount;
-      BigDecimal actualGrossTotal = totalGrossAmount;
+      
+      // WICHTIG: Berechne Brutto-Gesamtsumme aus der Netto-Gesamtsumme (nicht durch Addition der Zeilen)
+      // Verwende die häufigste MwSt-Rate (Standard: 19% falls keine gefunden)
+      if (mostCommonVatRate.compareTo(BigDecimal.ZERO) == 0) {
+        mostCommonVatRate = new BigDecimal("19");
+      }
+      BigDecimal actualGrossTotal = actualNetTotal.multiply(BigDecimal.ONE.add(mostCommonVatRate.movePointLeft(2)));
+      actualGrossTotal = actualGrossTotal.setScale(2, RoundingMode.HALF_UP);
       
       System.out.println("DEBUG: Total Net: " + actualNetTotal + ", Total Gross: " + actualGrossTotal);
       

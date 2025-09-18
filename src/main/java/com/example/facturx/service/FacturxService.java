@@ -47,8 +47,17 @@ public class FacturxService {
       }
       inv.setNumber(invNumber)
          .setIssueDate(java.sql.Date.valueOf(issue))
-         .setCurrency(dto.header != null && dto.header.currency != null ? dto.header.currency : "EUR")
-         .setDeliveryDate(java.sql.Date.valueOf(issue)); // Set delivery date to issue date as fallback
+         .setCurrency(dto.header != null && dto.header.currency != null ? dto.header.currency : "EUR");
+      
+      // Set delivery date to service_from if available, otherwise use issue date
+      LocalDate deliveryDate = issue;
+      if (dto.header != null && notBlank(dto.header.serviceFrom)) {
+        LocalDate serviceFrom = parseDate(dto.header.serviceFrom);
+        if (serviceFrom != null) {
+          deliveryDate = serviceFrom;
+        }
+      }
+      inv.setDeliveryDate(java.sql.Date.valueOf(deliveryDate));
       
       // Document type will be set later when we have the exporter
 
@@ -143,32 +152,10 @@ public class FacturxService {
         preps.add(p);
       }
 
-      // Ziel-Grand-Total bestimmen
-      BigDecimal targetGrandGross = null;
-      BigDecimal subtotalGross    = null;
-      BigDecimal discountGross    = null;
-
-      if (dto.totals != null) {
-        if (notBlank(dto.totals.grandTotalGross)) targetGrandGross = bd2(dto.totals.grandTotalGross);
-        if (notBlank(dto.totals.subtotalGross))   subtotalGross    = bd2(dto.totals.subtotalGross);
-        if (notBlank(dto.totals.discountGross))   discountGross    = bd2(dto.totals.discountGross);
-      }
-      if (targetGrandGross == null && subtotalGross != null && discountGross != null) {
-        targetGrandGross = subtotalGross.subtract(discountGross);
-      }
-      if (targetGrandGross == null) {
-        targetGrandGross = grossSumCalc.setScale(2, RoundingMode.HALF_UP);
-      }
-
-      BigDecimal scale = BigDecimal.ONE;
-      if (grossSumCalc.compareTo(BigDecimal.ZERO) > 0) {
-        scale = targetGrandGross.divide(grossSumCalc, 10, RoundingMode.HALF_UP);
-      }
-
-      // --- Items hinzufügen (skaliert) ---
+      // --- Items hinzufügen (ohne Skalierung - verwende Originalpreise) ---
       for (Prep p : preps) {
         String unit = notBlank(p.src.unitCode) ? p.src.unitCode : "C62";
-        BigDecimal unitNetScaled = p.unitNetOrig.multiply(scale).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal unitNet = p.unitNetOrig; // Use original price without scaling
 
         Product prod = new Product();
         prod.setName(p.src.description)
@@ -178,7 +165,7 @@ public class FacturxService {
           prod.setTaxCategoryCode(p.src.taxCategory);
         }
 
-        Item item = new Item(prod, p.qty, unitNetScaled);
+        Item item = new Item(prod, p.qty, unitNet);
 
         // Positions-Rabatt (netto)
         if (notBlank(p.src.discount)) {
@@ -191,6 +178,16 @@ public class FacturxService {
         }
 
         inv.addItem(item);
+      }
+      
+      // Add invoice-level discount if provided
+      if (dto.totals != null && notBlank(dto.totals.discountGross)) {
+        BigDecimal invoiceDiscount = bd2(dto.totals.discountGross);
+        if (invoiceDiscount.compareTo(BigDecimal.ZERO) > 0) {
+          ArrayList<Allowance> invoiceAllowances = new ArrayList<>();
+          invoiceAllowances.add(new Allowance(invoiceDiscount));
+          inv.setAllowances(invoiceAllowances);
+        }
       }
       
       // 3) Exporter: Try ZUGFeRDExporterFromPDFA first, fallback to ZUGFeRDExporterFromA3 for invoices

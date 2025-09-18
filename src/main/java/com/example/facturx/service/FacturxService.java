@@ -269,7 +269,7 @@ public class FacturxService {
         System.out.println("Set document type code to 220 (Invoice) using ZUGFeRDTransaction");
         
         // Use transaction instead of invoice directly
-        exporter.setTransaction(transaction);
+        exporter.setTransaction((org.mustangproject.ZUGFeRD.IExportableTransaction) transaction);
         System.out.println("Using ZUGFeRDTransaction for invoice generation");
       } catch (Exception e) {
         System.out.println("Could not use ZUGFeRDTransaction, falling back to direct Invoice: " + e.getMessage());

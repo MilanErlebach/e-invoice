@@ -261,7 +261,7 @@ public class FacturxService {
       }
       
       // --- Rundungsausgleich je MwSt-Kategorie ---
-      applyRoundingAdjustment(inv, dto.lines, dto.totals);
+      applyRoundingAdjustment(inv, dto.lines, dto.totals, preps);
       
       // 3) Exporter: Try ZUGFeRDExporterFromPDFA first, fallback to ZUGFeRDExporterFromA3 for invoices
       // CRITICAL: Use ZUGFeRDExporterFromA3 (not DXExporterFromA3) for proper invoice generation
@@ -387,7 +387,7 @@ public class FacturxService {
    * Wendet Rundungsausgleich je MwSt-Kategorie an, um Differenzen zwischen
    * Brutto→Netto Umrechnung zu eliminieren.
    */
-  private static void applyRoundingAdjustment(Invoice inv, List<Line> lines, TotalsDTO totals) {
+  private static void applyRoundingAdjustment(Invoice inv, List<Line> lines, TotalsDTO totals, List<Prep> preps) {
     if (lines == null || lines.isEmpty() || totals == null) {
       return;
     }
@@ -405,26 +405,24 @@ public class FacturxService {
       BigDecimal totalGrossAmount = BigDecimal.ZERO;
       BigDecimal mostCommonVatRate = BigDecimal.ZERO;
       
-      for (Line line : lines) {
-        if (!notBlank(line.description) || !notBlank(line.quantity)) {
+      // Verwende die gleichen angepassten Einzelpreise wie für die Mustang Library
+      for (Prep p : preps) {
+        if (!notBlank(p.src.description) || !notBlank(p.src.quantity)) {
           continue;
         }
-        
-        BigDecimal qty = bd4(line.quantity);
-        BigDecimal vatPct = bd2(defaultIfBlank(line.taxRate, "0"));
-        BigDecimal unitNet = line.unitNetPriceBD();
         
         // Skip negative prices (already handled as credit items)
-        if (unitNet.compareTo(BigDecimal.ZERO) < 0) {
+        if (p.unitNetOrig.compareTo(BigDecimal.ZERO) < 0) {
           continue;
         }
         
-        // Berechne Netto-Betrag für diese Zeile (2 Dezimalstellen)
-        BigDecimal lineNet = unitNet.multiply(qty).setScale(2, RoundingMode.HALF_UP);
+        // Berechne die gewünschte Netto-Positionssumme (wie in der Item-Erstellung)
+        BigDecimal originalUnitNet = p.src.unitNetPriceBD();
+        BigDecimal lineNet = originalUnitNet.multiply(p.qty).setScale(2, RoundingMode.HALF_UP);
         
         // Positionsrabatt berücksichtigen
-        if (notBlank(line.discount)) {
-          BigDecimal discNet = bd2(line.discount);
+        if (notBlank(p.src.discount)) {
+          BigDecimal discNet = bd2(p.src.discount);
           if (discNet.compareTo(BigDecimal.ZERO) > 0) {
             lineNet = lineNet.subtract(discNet).setScale(2, RoundingMode.HALF_UP);
             if (lineNet.compareTo(BigDecimal.ZERO) < 0) lineNet = BigDecimal.ZERO;
@@ -432,18 +430,18 @@ public class FacturxService {
         }
         
         // Berechne Brutto-Betrag für diese Zeile (2 Dezimalstellen)
-        BigDecimal lineGross = lineNet.multiply(BigDecimal.ONE.add(vatPct.movePointLeft(2))).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal lineGross = lineNet.multiply(BigDecimal.ONE.add(p.vatPct.movePointLeft(2))).setScale(2, RoundingMode.HALF_UP);
         
         // Addiere zu Gesamtsummen
         totalNetAmount = totalNetAmount.add(lineNet);
         totalGrossAmount = totalGrossAmount.add(lineGross);
         
         // Speichere die häufigste MwSt-Rate (für die Gesamtberechnung)
-        if (vatPct.compareTo(mostCommonVatRate) > 0) {
-          mostCommonVatRate = vatPct;
+        if (p.vatPct.compareTo(mostCommonVatRate) > 0) {
+          mostCommonVatRate = p.vatPct;
         }
         
-        System.out.println("DEBUG: Line " + line.description + " -> Net: " + lineNet + ", Gross: " + lineGross);
+        System.out.println("DEBUG: Line " + p.src.description + " -> Net: " + lineNet + ", Gross: " + lineGross);
       }
       
       // Die Netto-Gesamtsumme ist bereits auf 2 Dezimalstellen gerundet

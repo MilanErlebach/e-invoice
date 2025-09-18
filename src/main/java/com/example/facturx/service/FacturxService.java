@@ -419,7 +419,7 @@ public class FacturxService {
       System.out.println("DEBUG: Gross delta: " + grossDelta);
       
       // Wenn es eine signifikante Differenz gibt, füge einen Rundungsausgleich hinzu
-      if (grossDelta.abs().compareTo(new BigDecimal("0.001")) >= 0) {
+      if (grossDelta.abs().compareTo(new BigDecimal("0.0001")) >= 0) {
         System.out.println("DEBUG: Applying gross total adjustment: " + grossDelta);
         
         // Verwende die häufigste MwSt-Rate (19%) für den Ausgleich

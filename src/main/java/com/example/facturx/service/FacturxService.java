@@ -5,6 +5,7 @@ import com.example.facturx.model.InvoiceDTO.Line;
 import com.example.facturx.model.InvoiceDTO.PartyDTO;
 import org.mustangproject.*;
 import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromPDFA;
+import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromA1;
 import org.mustangproject.ZUGFeRD.Profiles;
 import org.mustangproject.ZUGFeRD.IZUGFeRDExporter;
 import org.mustangproject.ZUGFeRD.DXExporterFromA3;
@@ -192,30 +193,41 @@ public class FacturxService {
         inv.addItem(item);
       }
       
-      // 3) Exporter: Try ZUGFeRDExporterFromPDFA first (for proper invoice generation)
-      // If source PDF is not PDF/A compliant, fallback to DXExporterFromA3
+      // 3) Exporter: Try different exporters for proper invoice generation
+      // Priority: ZUGFeRDExporterFromA1 (for invoices) -> ZUGFeRDExporterFromPDFA -> DXExporterFromA3
       IZUGFeRDExporter exporter;
       try {
-        System.out.println("Attempting to use ZUGFeRDExporterFromPDFA for invoice generation...");
-        exporter = new ZUGFeRDExporterFromPDFA()
+        System.out.println("Attempting to use ZUGFeRDExporterFromA1 for invoice generation...");
+        exporter = new ZUGFeRDExporterFromA1()
             .load(tmpPdf.getAbsolutePath())
             .setZUGFeRDVersion(2)
             .setProfile(Profiles.getByName("EN16931"))
             .setProducer("FacturX-Converter")
             .setCreator("Mustangproject");
-        System.out.println("Successfully loaded PDF with ZUGFeRDExporterFromPDFA");
-      } catch (IllegalArgumentException e) {
-        if (e.getMessage().contains("PDF-A version not supported")) {
-          System.out.println("Source PDF is not PDF/A compliant, falling back to DXExporterFromA3...");
-          exporter = new DXExporterFromA3()
+        System.out.println("Successfully loaded PDF with ZUGFeRDExporterFromA1");
+      } catch (Exception e) {
+        System.out.println("ZUGFeRDExporterFromA1 failed, trying ZUGFeRDExporterFromPDFA...");
+        try {
+          exporter = new ZUGFeRDExporterFromPDFA()
               .load(tmpPdf.getAbsolutePath())
               .setZUGFeRDVersion(2)
               .setProfile(Profiles.getByName("EN16931"))
               .setProducer("FacturX-Converter")
               .setCreator("Mustangproject");
-          System.out.println("Successfully loaded PDF with DXExporterFromA3 (will convert to PDF/A-3)");
-        } else {
-          throw e; // Re-throw if it's a different error
+          System.out.println("Successfully loaded PDF with ZUGFeRDExporterFromPDFA");
+        } catch (IllegalArgumentException e2) {
+          if (e2.getMessage().contains("PDF-A version not supported")) {
+            System.out.println("Source PDF is not PDF/A compliant, falling back to DXExporterFromA3...");
+            exporter = new DXExporterFromA3()
+                .load(tmpPdf.getAbsolutePath())
+                .setZUGFeRDVersion(2)
+                .setProfile(Profiles.getByName("EN16931"))
+                .setProducer("FacturX-Converter")
+                .setCreator("Mustangproject");
+            System.out.println("Successfully loaded PDF with DXExporterFromA3 (will convert to PDF/A-3)");
+          } else {
+            throw e2; // Re-throw if it's a different error
+          }
         }
       }
 

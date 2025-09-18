@@ -199,7 +199,7 @@ public class FacturxService {
                       .setUnit("C62")
                       .setVATPercent(BigDecimal.ZERO);
           
-          Item discountItem = new Item(discountProd, BigDecimal.ONE, invoiceDiscount.negate());
+          Item discountItem = new Item(discountProd, invoiceDiscount.negate(), BigDecimal.ONE);
           inv.addItem(discountItem);
           System.out.println("Adding invoice discount: " + invoiceDiscount);
         }
@@ -224,7 +224,7 @@ public class FacturxService {
               creditProd.setTaxCategoryCode(l.taxCategory);
             }
             
-            Item creditItem = new Item(creditProd, qty, unitNet.abs().negate());
+            Item creditItem = new Item(creditProd, unitNet.abs().negate(), qty);
             inv.addItem(creditItem);
             System.out.println("Adding credit line item: " + l.description + " = " + unitNet.abs().multiply(qty));
           }

@@ -376,6 +376,7 @@ public class FacturxService {
       System.out.println("DEBUG: Expected gross total from input: " + expectedGrossTotal);
       
       // Berechne die tatsächliche Brutto-Summe aus den Items
+      // WICHTIG: Verwende die gleiche Rundung wie die Mustang Library (2 Dezimalstellen)
       BigDecimal actualGrossTotal = BigDecimal.ZERO;
       
       for (Line line : lines) {
@@ -392,24 +393,28 @@ public class FacturxService {
           continue;
         }
         
-        // Brutto zur Gesamtsumme hinzufügen
-        BigDecimal unitGross = unitNet.multiply(BigDecimal.ONE.add(vatPct.movePointLeft(2)));
-        BigDecimal lineGross = unitGross.multiply(qty);
+        // WICHTIG: Runde Netto-Preise auf 2 Dezimalstellen wie die Mustang Library
+        BigDecimal unitNetRounded = unitNet.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal lineNet = unitNetRounded.multiply(qty);
         
         // Positionsrabatt berücksichtigen
         if (notBlank(line.discount)) {
           BigDecimal discNet = bd2(line.discount);
           if (discNet.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal lineNet = unitNet.multiply(qty).subtract(discNet);
+            lineNet = lineNet.subtract(discNet);
             if (lineNet.compareTo(BigDecimal.ZERO) < 0) lineNet = BigDecimal.ZERO;
-            unitNet = lineNet.divide(qty, 4, RoundingMode.HALF_UP);
-            unitGross = unitNet.multiply(BigDecimal.ONE.add(vatPct.movePointLeft(2)));
-            lineGross = unitGross.multiply(qty);
           }
         }
         
+        // Runde Netto-Summe auf 2 Dezimalstellen
+        lineNet = lineNet.setScale(2, RoundingMode.HALF_UP);
+        
+        // Berechne Brutto mit gerundeten Netto-Werten
+        BigDecimal lineGross = lineNet.multiply(BigDecimal.ONE.add(vatPct.movePointLeft(2)));
+        lineGross = lineGross.setScale(2, RoundingMode.HALF_UP);
+        
         actualGrossTotal = actualGrossTotal.add(lineGross);
-        System.out.println("DEBUG: Line " + line.description + " -> Gross: " + lineGross + ", Net: " + unitNet.multiply(qty));
+        System.out.println("DEBUG: Line " + line.description + " -> Net: " + lineNet + ", Gross: " + lineGross);
       }
       
       System.out.println("DEBUG: Calculated gross total: " + actualGrossTotal + ", Expected: " + expectedGrossTotal);
@@ -419,10 +424,11 @@ public class FacturxService {
       System.out.println("DEBUG: Gross delta: " + grossDelta);
       
       // Wenn es eine signifikante Differenz gibt, füge einen Rundungsausgleich hinzu
-      if (grossDelta.abs().compareTo(new BigDecimal("0.0001")) >= 0) {
+      // Threshold für 2-Dezimalstellen-Rundung (mindestens 0.01 EUR Unterschied)
+      if (grossDelta.abs().compareTo(new BigDecimal("0.005")) >= 0) {
         System.out.println("DEBUG: Applying gross total adjustment: " + grossDelta);
         
-        // Verwende die häufigste MwSt-Rate (19%) für den Ausgleich
+        // Runde den Anpassungsbetrag auf 2 Dezimalstellen für Konsistenz
         BigDecimal adjustmentAmount = grossDelta.setScale(2, RoundingMode.HALF_UP);
         
         VatCategoryInfo info = new VatCategoryInfo();
@@ -470,7 +476,9 @@ public class FacturxService {
       adjustmentProd.setTaxCategoryCode(info.taxCategory);
     }
     
+    // Verwende den exakten Betrag (bereits auf 2 Dezimalstellen gerundet)
     BigDecimal itemAmount = isAllowance ? amount.negate() : amount;
+    
     Item adjustmentItem = new Item(adjustmentProd, itemAmount, BigDecimal.ONE);
     inv.addItem(adjustmentItem);
     

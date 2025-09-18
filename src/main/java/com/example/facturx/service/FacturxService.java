@@ -75,6 +75,14 @@ public class FacturxService {
       TradeParty buyer  = mapParty(dto.buyer,  false);
       inv.setSender(seller);
       inv.setRecipient(buyer);
+      
+      // Validate required parties
+      if (seller == null) {
+        throw new IllegalArgumentException("Seller information is required");
+      }
+      if (buyer == null) {
+        throw new IllegalArgumentException("Buyer information is required");
+      }
 
       // BuyerReference (Käuferreferenz)
       if (dto.buyer != null && notBlank(dto.buyer.buyerReference)) {
@@ -196,11 +204,27 @@ public class FacturxService {
       // Debug: Check invoice dates before setting transaction
       System.out.println("Invoice issue date: " + inv.getIssueDate());
       System.out.println("Invoice due date: " + inv.getDueDate());
+      System.out.println("Invoice delivery date: " + inv.getDeliveryDate());
       System.out.println("Invoice number: " + inv.getNumber());
       System.out.println("Invoice currency: " + inv.getCurrency());
       System.out.println("Invoice sender: " + (inv.getSender() != null ? inv.getSender().getName() : "null"));
       System.out.println("Invoice recipient: " + (inv.getRecipient() != null ? inv.getRecipient().getName() : "null"));
       System.out.println("Invoice items count: " + "checking items...");
+      
+      // CRITICAL: Ensure all required dates are set - Mustang library is very strict about this
+      if (inv.getIssueDate() == null) {
+        System.out.println("WARNING: Issue date is null, setting to today");
+        inv.setIssueDate(java.sql.Date.valueOf(LocalDate.now()));
+      }
+      if (inv.getDeliveryDate() == null) {
+        System.out.println("WARNING: Delivery date is null, setting to issue date");
+        inv.setDeliveryDate(inv.getIssueDate());
+      }
+      if (inv.getDueDate() == null) {
+        System.out.println("WARNING: Due date is null, setting to issue date + 14 days");
+        LocalDate dueDate = LocalDate.now().plusDays(14);
+        inv.setDueDate(java.sql.Date.valueOf(dueDate));
+      }
       
       // Direkt die Invoice übergeben (ohne ZUGFeRDTransaction)
       exporter.setTransaction(inv);

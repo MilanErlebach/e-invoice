@@ -459,44 +459,23 @@ public class FacturxService {
    * Fügt einen Rundungsausgleich als Allowance/Charge oder Fallback-Item hinzu.
    */
   private static void addRoundingAdjustment(Invoice inv, VatCategoryInfo info, BigDecimal amount, boolean isAllowance) {
-    try {
-      // Versuche zuerst Document-level Allowance/Charge
-      if (isAllowance) {
-        Allowance allowance = new Allowance(amount);
-        // Set VAT percentage for the allowance
-        allowance.setVATPercent(info.vatPercent);
-        // Note: setReason might not be available in this version of Mustang
-        inv.addAllowance(allowance);
-        System.out.println("INFO: Rundungsausgleich hinzugefügt - Kategorie: " + info.vatPercent + "%/" + info.taxCategory + 
-                          ", Delta: -" + amount + " EUR, Methode: Allowance");
-      } else {
-        Charge charge = new Charge(amount);
-        // Set VAT percentage for the charge
-        charge.setVATPercent(info.vatPercent);
-        // Note: setReason might not be available in this version of Mustang
-        inv.addCharge(charge);
-        System.out.println("INFO: Rundungsausgleich hinzugefügt - Kategorie: " + info.vatPercent + "%/" + info.taxCategory + 
-                          ", Delta: +" + amount + " EUR, Methode: Charge");
-      }
-    } catch (Exception e) {
-      // Fallback: Item-basierter Rundungsausgleich
-      System.out.println("WARN: Document-level Allowance/Charge nicht unterstützt, verwende Fallback-Item: " + e.getMessage());
-      
-      Product adjustmentProd = new Product();
-      adjustmentProd.setName("Rundungsausgleich")
-                   .setUnit("C62")
-                   .setVATPercent(info.vatPercent);
-      if (info.taxCategory != null) {
-        adjustmentProd.setTaxCategoryCode(info.taxCategory);
-      }
-      
-      BigDecimal itemAmount = isAllowance ? amount.negate() : amount;
-      Item adjustmentItem = new Item(adjustmentProd, itemAmount, BigDecimal.ONE);
-      inv.addItem(adjustmentItem);
-      
-      System.out.println("INFO: Rundungsausgleich hinzugefügt - Kategorie: " + info.vatPercent + "%/" + info.taxCategory + 
-                        ", Delta: " + (isAllowance ? "-" : "+") + amount + " EUR, Methode: Fallback-Item");
+    // Use fallback approach directly since Document-level Allowance/Charge has issues with VAT percentage
+    System.out.println("INFO: Using fallback item approach for rounding adjustment");
+    
+    Product adjustmentProd = new Product();
+    adjustmentProd.setName("Rundungsausgleich")
+                 .setUnit("C62")
+                 .setVATPercent(info.vatPercent);
+    if (info.taxCategory != null) {
+      adjustmentProd.setTaxCategoryCode(info.taxCategory);
     }
+    
+    BigDecimal itemAmount = isAllowance ? amount.negate() : amount;
+    Item adjustmentItem = new Item(adjustmentProd, itemAmount, BigDecimal.ONE);
+    inv.addItem(adjustmentItem);
+    
+    System.out.println("INFO: Rundungsausgleich hinzugefügt - Kategorie: " + info.vatPercent + "%/" + info.taxCategory + 
+                      ", Delta: " + (isAllowance ? "-" : "+") + amount + " EUR, Methode: Fallback-Item");
   }
   
   /**

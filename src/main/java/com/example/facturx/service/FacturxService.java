@@ -49,15 +49,25 @@ public class FacturxService {
          .setCurrency(dto.header != null && dto.header.currency != null ? dto.header.currency : "EUR")
          .setDeliveryDate(java.sql.Date.valueOf(issue)); // Set delivery date to issue date as fallback
       
-      // Explicitly set document type to invoice (TypeCode 220)
-      // This ensures we generate an invoice, not a despatch advice
+      // Try to set document type using ZUGFeRDTransaction wrapper
+      // This might help ensure proper invoice generation
       try {
-        // Try to set the document type using reflection if the method exists
-        java.lang.reflect.Method setTypeCodeMethod = inv.getClass().getMethod("setTypeCode", String.class);
-        setTypeCodeMethod.invoke(inv, "220"); // 220 = Invoice
-        System.out.println("Set document type code to 220 (Invoice)");
+        // Import ZUGFeRDTransaction if available
+        Class<?> transactionClass = Class.forName("org.mustangproject.ZUGFeRD.ZUGFeRDTransaction");
+        Object transaction = transactionClass.getConstructor(Invoice.class).newInstance(inv);
+        
+        // Try to set document type on transaction
+        java.lang.reflect.Method setTypeCodeMethod = transactionClass.getMethod("setTypeCode", String.class);
+        setTypeCodeMethod.invoke(transaction, "220"); // 220 = Invoice
+        System.out.println("Set document type code to 220 (Invoice) using ZUGFeRDTransaction");
+        
+        // Use transaction instead of invoice directly
+        exporter.setTransaction(transaction);
+        System.out.println("Using ZUGFeRDTransaction for invoice generation");
       } catch (Exception e) {
-        System.out.println("Could not set document type code (method may not exist): " + e.getMessage());
+        System.out.println("Could not use ZUGFeRDTransaction, falling back to direct Invoice: " + e.getMessage());
+        // Fallback to direct invoice
+        exporter.setTransaction(inv);
       }
 
       // Leistungszeitraum - only set if both dates are valid
@@ -265,8 +275,7 @@ public class FacturxService {
         inv.setCurrency("EUR");
       }
       
-      // Direkt die Invoice übergeben (ohne ZUGFeRDTransaction)
-      exporter.setTransaction(inv);
+      // Transaction is already set above (either ZUGFeRDTransaction or direct Invoice)
 
       ByteArrayOutputStream bos = new ByteArrayOutputStream();
       exporter.export(bos);

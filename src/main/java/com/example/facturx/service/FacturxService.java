@@ -49,26 +49,7 @@ public class FacturxService {
          .setCurrency(dto.header != null && dto.header.currency != null ? dto.header.currency : "EUR")
          .setDeliveryDate(java.sql.Date.valueOf(issue)); // Set delivery date to issue date as fallback
       
-      // Try to set document type using ZUGFeRDTransaction wrapper
-      // This might help ensure proper invoice generation
-      try {
-        // Import ZUGFeRDTransaction if available
-        Class<?> transactionClass = Class.forName("org.mustangproject.ZUGFeRD.ZUGFeRDTransaction");
-        Object transaction = transactionClass.getConstructor(Invoice.class).newInstance(inv);
-        
-        // Try to set document type on transaction
-        java.lang.reflect.Method setTypeCodeMethod = transactionClass.getMethod("setTypeCode", String.class);
-        setTypeCodeMethod.invoke(transaction, "220"); // 220 = Invoice
-        System.out.println("Set document type code to 220 (Invoice) using ZUGFeRDTransaction");
-        
-        // Use transaction instead of invoice directly
-        exporter.setTransaction(transaction);
-        System.out.println("Using ZUGFeRDTransaction for invoice generation");
-      } catch (Exception e) {
-        System.out.println("Could not use ZUGFeRDTransaction, falling back to direct Invoice: " + e.getMessage());
-        // Fallback to direct invoice
-        exporter.setTransaction(inv);
-      }
+      // Document type will be set later when we have the exporter
 
       // Leistungszeitraum - only set if both dates are valid
       if (dto.header != null && notBlank(dto.header.serviceFrom) && notBlank(dto.header.serviceTo)) {
@@ -275,7 +256,26 @@ public class FacturxService {
         inv.setCurrency("EUR");
       }
       
-      // Transaction is already set above (either ZUGFeRDTransaction or direct Invoice)
+      // Try to set document type using ZUGFeRDTransaction wrapper
+      // This might help ensure proper invoice generation
+      try {
+        // Import ZUGFeRDTransaction if available
+        Class<?> transactionClass = Class.forName("org.mustangproject.ZUGFeRD.ZUGFeRDTransaction");
+        Object transaction = transactionClass.getConstructor(Invoice.class).newInstance(inv);
+        
+        // Try to set document type on transaction
+        java.lang.reflect.Method setTypeCodeMethod = transactionClass.getMethod("setTypeCode", String.class);
+        setTypeCodeMethod.invoke(transaction, "220"); // 220 = Invoice
+        System.out.println("Set document type code to 220 (Invoice) using ZUGFeRDTransaction");
+        
+        // Use transaction instead of invoice directly
+        exporter.setTransaction(transaction);
+        System.out.println("Using ZUGFeRDTransaction for invoice generation");
+      } catch (Exception e) {
+        System.out.println("Could not use ZUGFeRDTransaction, falling back to direct Invoice: " + e.getMessage());
+        // Fallback to direct invoice
+        exporter.setTransaction(inv);
+      }
 
       ByteArrayOutputStream bos = new ByteArrayOutputStream();
       exporter.export(bos);

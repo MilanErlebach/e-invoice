@@ -55,7 +55,10 @@ public class FacturxService {
         LocalDate serviceFrom = parseDate(dto.header.serviceFrom);
         if (serviceFrom != null) {
           deliveryDate = serviceFrom;
+          System.out.println("Using service_from as delivery date: " + serviceFrom);
         }
+      } else {
+        System.out.println("No service_from found, using issue date as delivery date: " + issue);
       }
       inv.setDeliveryDate(java.sql.Date.valueOf(deliveryDate));
       
@@ -129,6 +132,12 @@ public class FacturxService {
         BigDecimal vatPct  = bd2(defaultIfBlank(l.taxRate, "0"));
         BigDecimal unitNet = l.unitNetPriceBD();
 
+        // Handle negative prices as credits (skip them from line items, will be added as allowances)
+        if (unitNet.compareTo(BigDecimal.ZERO) < 0) {
+          System.out.println("Skipping negative price line: " + l.description + " (" + unitNet + ")");
+          continue; // Skip negative price lines - they should be handled as allowances
+        }
+
         // Brutto zur Skalierung
         BigDecimal unitGross = unitNet.multiply(BigDecimal.ONE.add(vatPct.movePointLeft(2)));
         BigDecimal lineGross = unitGross.multiply(qty);
@@ -188,6 +197,26 @@ public class FacturxService {
           invoiceAllowances.add(new Allowance(invoiceDiscount));
           inv.setAllowances(invoiceAllowances);
         }
+      }
+      
+      // Add negative price lines as allowances (credits)
+      ArrayList<Allowance> negativePriceAllowances = new ArrayList<>();
+      for (Line l : dto.lines) {
+        if (notBlank(l.description) && notBlank(l.quantity)) {
+          BigDecimal qty = bd4(l.quantity);
+          BigDecimal unitNet = l.unitNetPriceBD();
+          
+          if (unitNet.compareTo(BigDecimal.ZERO) < 0) {
+            // Convert negative price to positive allowance
+            BigDecimal creditAmount = unitNet.abs().multiply(qty);
+            negativePriceAllowances.add(new Allowance(creditAmount));
+            System.out.println("Adding credit allowance: " + l.description + " = " + creditAmount);
+          }
+        }
+      }
+      
+      if (!negativePriceAllowances.isEmpty()) {
+        inv.setAllowances(negativePriceAllowances);
       }
       
       // 3) Exporter: Try ZUGFeRDExporterFromPDFA first, fallback to ZUGFeRDExporterFromA3 for invoices

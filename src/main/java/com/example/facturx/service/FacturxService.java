@@ -491,10 +491,8 @@ public class FacturxService {
     Product adjustmentProd = new Product();
     adjustmentProd.setName("Rundungsausgleich")
                  .setUnit("C62")
-                 .setVATPercent(info.vatPercent);
-    if (info.taxCategory != null) {
-      adjustmentProd.setTaxCategoryCode(info.taxCategory);
-    }
+                 .setVATPercent(BigDecimal.ZERO); // Rundungsausgleich ist steuerfrei
+    adjustmentProd.setTaxCategoryCode("E"); // E = Exempt (steuerfrei)
     
     // Verwende den exakten Betrag (bereits auf 2 Dezimalstellen gerundet)
     BigDecimal itemAmount = isAllowance ? amount.negate() : amount;

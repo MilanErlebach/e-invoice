@@ -131,10 +131,10 @@ public class FacturxService {
         BigDecimal vatPct  = bd2(defaultIfBlank(l.taxRate, "0"));
         BigDecimal unitNet = l.unitNetPriceBD();
 
-        // Handle negative prices as credits (skip them from line items, will be added as allowances)
+        // Handle negative prices as credits (still add to preps for rounding calculation)
         if (unitNet.compareTo(BigDecimal.ZERO) < 0) {
           System.out.println("Skipping negative price line: " + l.description + " (" + unitNet + ")");
-          continue; // Skip negative price lines - they should be handled as allowances
+          // Don't skip - add to preps for rounding calculation, but skip from line items
         }
 
         // Brutto zur Skalierung (2 Dezimalstellen)
@@ -162,6 +162,11 @@ public class FacturxService {
 
       // --- Items hinzufügen (korrigiere Einzelpreise für korrekte Positionssummen) ---
       for (Prep p : preps) {
+        // Skip negative prices from item creation (they will be handled as credit items)
+        if (p.unitNetOrig.compareTo(BigDecimal.ZERO) < 0) {
+          continue;
+        }
+        
         String unit = notBlank(p.src.unitCode) ? p.src.unitCode : "C62";
         
         // Berechne die gewünschte Positionssumme (wie in der Rundungsberechnung)

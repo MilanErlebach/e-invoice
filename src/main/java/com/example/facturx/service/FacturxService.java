@@ -408,10 +408,8 @@ public class FacturxService {
           continue;
         }
         
-        // Skip negative prices (already handled as credit items)
-        if (p.unitNetOrig.compareTo(BigDecimal.ZERO) < 0) {
-          continue;
-        }
+        // WICHTIG: Berücksichtige auch negative Preise in der Rundungsberechnung
+        // Diese werden als Credit Items behandelt und müssen in der Gesamtberechnung enthalten sein
         
       // Verwende die gleiche Logik wie in der Item-Erstellung
       // Berechne die gewünschte Netto-Positionssumme
@@ -429,7 +427,15 @@ public class FacturxService {
       
       // WICHTIG: Verwende den bereits berechneten adjustedUnitNet für die korrekte Positionssumme
       // Das ist der Wert, der tatsächlich an Mustang übergeben wird
-      BigDecimal actualLineNet = p.unitNetAdjusted.multiply(p.qty).setScale(2, RoundingMode.HALF_UP);
+      // Für negative Preise verwende den ursprünglichen Wert (da sie als Credit Items behandelt werden)
+      BigDecimal actualLineNet;
+      if (p.unitNetOrig.compareTo(BigDecimal.ZERO) < 0) {
+        // Für negative Preise: verwende den ursprünglichen Wert (wird als Credit Item hinzugefügt)
+        actualLineNet = originalUnitNet.multiply(p.qty).setScale(2, RoundingMode.HALF_UP);
+      } else {
+        // Für positive Preise: verwende den angepassten Wert
+        actualLineNet = p.unitNetAdjusted.multiply(p.qty).setScale(2, RoundingMode.HALF_UP);
+      }
         
       // Berechne Brutto-Betrag für diese Zeile (2 Dezimalstellen) mit dem korrekten Netto-Betrag
       BigDecimal lineGross = actualLineNet.multiply(BigDecimal.ONE.add(p.vatPct.movePointLeft(2))).setScale(2, RoundingMode.HALF_UP);

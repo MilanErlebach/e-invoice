@@ -114,6 +114,22 @@ public class FacturxService {
         inv.setPaymentReference(dto.payment.remittanceInformation);
       }
 
+      // Payment Means Logic
+      if (dto.payment != null) {
+        if ("paid".equals(dto.payment.paymentStatus)) {
+          // Rechnung bereits bezahlt - setze Payment Term Description
+          inv.setPaymentTermDescription("Rechnung bereits bezahlt");
+          System.out.println("DEBUG: Payment status: paid - setting payment as already paid");
+        } else {
+          // SEPA Credit Transfer (Standard) - Payment Term Description wird bereits gesetzt
+          // Die Mustang Library setzt standardmäßig SEPA Credit Transfer
+          System.out.println("DEBUG: Payment status: " + dto.payment.paymentStatus + " - using SEPA Credit Transfer");
+        }
+      } else {
+        // Fallback: SEPA Credit Transfer wenn keine Payment-Informationen vorhanden
+        System.out.println("DEBUG: No payment information - using default SEPA Credit Transfer");
+      }
+
       // --- Positionen vorbereiten (Skalierung auf gewünschtes Grand Total) ---
       if (dto.lines == null || dto.lines.isEmpty()) {
         throw new IllegalArgumentException("At least one line is required");

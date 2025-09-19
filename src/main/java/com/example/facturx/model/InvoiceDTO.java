@@ -47,6 +47,9 @@ public class InvoiceDTO {
     public String iban;
     public String bic;
 
+    @JsonProperty("payment_status")
+    public String paymentStatus; // "paid" or other values
+
     @JsonProperty("remittance_information")
     @JsonAlias({"remittance_info"})
     public String remittanceInformation;

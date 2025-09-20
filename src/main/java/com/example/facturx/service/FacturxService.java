@@ -10,6 +10,7 @@ import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromA1;
 import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromA3;
 import org.mustangproject.ZUGFeRD.Profiles;
 import org.mustangproject.ZUGFeRD.IZUGFeRDExporter;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -28,6 +29,9 @@ import java.util.Map;
 public class FacturxService {
 
   private static final DateTimeFormatter DATE = DateTimeFormatter.ISO_LOCAL_DATE;
+  
+  @Autowired
+  private CountryMappingService countryMappingService;
 
   public byte[] buildFacturX(InvoiceDTO dto, MultipartFile sourcePdf) {
     File tmpPdf = null;
@@ -389,14 +393,21 @@ public class FacturxService {
   }
 
   /** mappt DTO->TradeParty und hängt bei Seller IBAN/BIC als BankDetails an */
-  private static TradeParty mapParty(PartyDTO p, boolean isSeller) {
+  private TradeParty mapParty(PartyDTO p, boolean isSeller) {
     if (p == null) return null;
     TradeParty tp = new TradeParty();
     if (notBlank(p.name))  tp.setName(p.name);
     if (notBlank(p.street)) tp.setStreet(p.street);
     if (notBlank(p.zip))    tp.setZIP(p.zip);
     if (notBlank(p.city))   tp.setLocation(p.city);
-    if (notBlank(p.country))tp.setCountry(p.country);
+    
+    // Convert country name to ISO-3166-1 alpha-2 code
+    if (notBlank(p.country)) {
+      String countryCode = countryMappingService.getCountryCode(p.country);
+      tp.setCountry(countryCode);
+      System.out.println("DEBUG: Country mapping: '" + p.country + "' -> '" + countryCode + "'");
+    }
+    
     if (notBlank(p.vatId))  tp.addVATID(p.vatId);
     if (notBlank(p.taxNumber)) tp.addTaxID(p.taxNumber);
     if (notBlank(p.email))     tp.setEmail(p.email);

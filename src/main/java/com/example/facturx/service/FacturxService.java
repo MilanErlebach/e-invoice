@@ -7,8 +7,6 @@ import com.example.facturx.model.InvoiceDTO.TotalsDTO;
 import org.mustangproject.*;
 import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromPDFA;
 import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromA1;
-
-
 import org.mustangproject.ZUGFeRD.ZUGFeRDExporterFromA3;
 import org.mustangproject.ZUGFeRD.Profiles;
 import org.mustangproject.ZUGFeRD.IZUGFeRDExporter;
@@ -114,20 +112,37 @@ public class FacturxService {
         inv.setPaymentReference(dto.payment.remittanceInformation);
       }
 
-      // Payment Means Logic
-      if (dto.payment != null) {
-        if ("paid".equals(dto.payment.paymentStatus)) {
-          // Rechnung bereits bezahlt - setze Payment Term Description
-          inv.setPaymentTermDescription("Rechnung bereits bezahlt");
-          System.out.println("DEBUG: Payment status: paid - setting payment as already paid");
-        } else {
-          // SEPA Credit Transfer (Standard) - Payment Term Description wird bereits gesetzt
-          // Die Mustang Library setzt standardmäßig SEPA Credit Transfer
-          System.out.println("DEBUG: Payment status: " + dto.payment.paymentStatus + " - using SEPA Credit Transfer");
-        }
+      // Payment Means Logic with proper TypeCode setting via BankDetails
+      boolean isPaid = dto.payment != null && "paid".equals(dto.payment.paymentStatus);
+      
+      // Ensure seller has a BankDetails entry; create if missing
+      List<BankDetails> banks = seller.getBankDetails();
+      BankDetails bank;
+      if (banks == null || banks.isEmpty()) {
+        bank = new BankDetails();
+        // Set IBAN/BIC from seller if present
+        if (notBlank(dto.seller.iban)) bank.setIBAN(dto.seller.iban);
+        if (notBlank(dto.seller.bic))  bank.setBIC(dto.seller.bic);
+        seller.addBankDetails(bank);
       } else {
-        // Fallback: SEPA Credit Transfer wenn keine Payment-Informationen vorhanden
-        System.out.println("DEBUG: No payment information - using default SEPA Credit Transfer");
+        bank = banks.get(0);
+      }
+      
+      // Set payment means code + information
+      if (isPaid) {
+        bank.setPaymentMeansCode("ZZZ");                      // Sonstige
+        bank.setPaymentMeansInformation("Bereits bezahlt");   // free text
+        inv.setPaymentTermDescription("Bereits bezahlt");
+        System.out.println("DEBUG: Payment status: paid - setting TypeCode ZZZ (already paid)");
+      } else {
+        bank.setPaymentMeansCode("58");                       // SEPA Credit Transfer
+        bank.setPaymentMeansInformation("SEPA Credit Transfer");
+        // Make sure IBAN/BIC are present for unpaid case
+        if (dto.payment != null) {
+          if (notBlank(dto.payment.iban)) bank.setIBAN(dto.payment.iban);
+          if (notBlank(dto.payment.bic))  bank.setBIC(dto.payment.bic);
+        }
+        System.out.println("DEBUG: Payment status: " + (dto.payment != null ? dto.payment.paymentStatus : "null") + " - setting TypeCode 58 (SEPA Credit Transfer)");
       }
 
       // --- Positionen vorbereiten (Skalierung auf gewünschtes Grand Total) ---

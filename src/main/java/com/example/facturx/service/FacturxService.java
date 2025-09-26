@@ -510,6 +510,20 @@ public class FacturxService {
       BigDecimal actualGrossTotal = actualNetTotal.multiply(BigDecimal.ONE.add(mostCommonVatRate.movePointLeft(2)));
       actualGrossTotal = actualGrossTotal.setScale(2, RoundingMode.HALF_UP);
       
+      // WICHTIG: Berücksichtige Rechnungsrabatt in der Berechnung
+      // Der expectedGrossTotal ist der finale Betrag NACH dem Rechnungsrabatt
+      // Aber unsere actualGrossTotal Berechnung berücksichtigt den Rechnungsrabatt nicht
+      // Daher müssen wir den Rechnungsrabatt von unserer Berechnung abziehen
+      if (totals != null && notBlank(totals.discountGross)) {
+        BigDecimal invoiceDiscount = bd2(totals.discountGross);
+        if (invoiceDiscount.compareTo(BigDecimal.ZERO) > 0) {
+          // Der Rechnungsrabatt wurde als separater Item hinzugefügt (negativer Betrag)
+          // Daher müssen wir ihn von unserer Berechnung abziehen, um den korrekten Vergleich zu haben
+          actualGrossTotal = actualGrossTotal.subtract(invoiceDiscount);
+          System.out.println("DEBUG: Subtracting invoice-level discount of " + invoiceDiscount + " from calculated total");
+        }
+      }
+      
       System.out.println("DEBUG: Total Net: " + actualNetTotal + ", Total Gross: " + actualGrossTotal);
       
       System.out.println("DEBUG: Calculated gross total: " + actualGrossTotal + ", Expected: " + expectedGrossTotal);
